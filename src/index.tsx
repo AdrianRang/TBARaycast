@@ -1,106 +1,100 @@
-import { ActionPanel, Action, List, Detail } from "@raycast/api";
+import { ActionPanel, Action, List, Detail, Image } from "@raycast/api";
 import { useEffect, useState } from "react";
 import axios from "axios";
 
 
 const API_KEY = "4FmWpc7JdnQpxdAmng6DVVQ8MMuD9qtIzU6T7auUQViDt6ZJK3v28SIbwurR2J7n";
-const TEAM_LIMIT = 50;
+const TEAM_LIMIT = 250;
 
 
-async function getAllTeamNumbersPromise() {
-  console.debug("Fetching team numbers...");
-  let teamNumbers: string[] = [];
+async function getAllTeamData() {
+  let teamData: any[] = [];
   for (let i = 0; i < 1; i++) {
-    console.debug(`Fetching team numbers for page ${i}...`);
-    const response = axios.get(`https://www.thebluealliance.com/api/v3/teams/${i}/keys`, {
+    const response = axios.get(`https://www.thebluealliance.com/api/v3/teams/${i}/simple`, {
       headers: {
         'X-TBA-Auth-Key': API_KEY
       }
     });
     await response.then((response) => {
-      response.data.forEach((teamNumber: string, i: number) => {
+      response.data.forEach((teamdata: any, i: number) => {
         if (i > TEAM_LIMIT) return;
-        teamNumbers.push(teamNumber.replace("frc", ""));
+        teamData.push(teamdata);
       });
-      console.debug(`Found ${teamNumbers.length} team numbers.`);
-    });
-    console.debug(`Team numbers: ${teamNumbers}`);
-    return teamNumbers;
+    });;
+    return teamData;
   }
 }
 
-let tm = getAllTeamNumbersPromise()
-function getAllTeamNumbers() {
-  let n = (tm).then((teamNumbers) => {
-    return teamNumbers as string[];
+async function getTeamLogo(teamNumber: string) {
+  const response = await axios.get(`https://www.thebluealliance.com/api/v3/team/frc254/media/2024`, {
+    headers: {
+      'X-TBA-Auth-Key': API_KEY
+    }
   });
-  let teamNumbers = [] as string[];
-  n.then((teamNumbers) => {
-    teamNumbers.forEach((teamNumber) => {
-      teamNumbers.push(teamNumber);
-    });
-  });
-  console.debug("success")
-  return teamNumbers;
+  console.debug("response: ", response.data[0].base64Image);
+  return response.data[0].base64Image;
+  // return "https://www.thebluealliance.com/images/team_logos/2024.png";
 }
 
+async function getAllTeamLogos(teamNumbers: string[]) {
+  let teamLogos: string[] = [];
+  teamLogos.forEach(async (teamNumber) => {
+    teamLogos.push(await getTeamLogo(teamNumber))
+  });
+  return teamLogos;
 
-async function getTeamName(teamNumber: string): Promise<string> {
-  try {
-    const response = await axios.get(`https://www.thebluealliance.com/api/v3/team/frc${teamNumber}`, {
-      headers: {
-        'X-TBA-Auth-Key': API_KEY
-      }
-    });
-    return response.data.nickname;
-  } catch (error) {
-    console.error(`Failed to get team name for team ${teamNumber}:`, error);
-    return "Unknown";
-  }
 }
-
 
 export default function Command() {
-  const [teamNumbers, setTeamNumbers] = useState<string[]>([]);
-  const [teamNames, setTeamNames] = useState<string[]>([]);
+  const [teamData, setTeamData] = useState<string[][]>([[]]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Fetch team numbers and update state
-    const fetchTeamNumbers = async () => {
-      const teamNumbersPromise = await getAllTeamNumbersPromise();
-      const numbers = await Promise.all((teamNumbersPromise ?? []).map((teamNumber) => teamNumber));
-      console.debug("numbers: ", numbers);
-      setTeamNumbers(numbers);
-    };
-    fetchTeamNumbers();
+    const fetchTeamData = async () => {
+      const teamData = await getAllTeamData();
+      const teamLogos = await getAllTeamLogos((teamData ?? []).map((teamData) => teamData.key.substring(3)));
 
-    // Fetch team names and update state
-    const fetchTeamNames = async () => {
-      const names = await Promise.all((await (teamNumbers)).map((teamNumber) => getTeamName(teamNumber)));
-      setTeamNames(names);
-    };
-
-    fetchTeamNames();
+      const numbers = await Promise.all((teamData ?? []).map((teamData) => teamData.key.substring(3)));
+      const names = await Promise.all((teamData ?? []).map((teamData) => teamData.nickname));
+      const city = await Promise.all((teamData ?? []).map((teamData) => teamData.city));
+      const country = await Promise.all((teamData ?? []).map((teamData) => teamData.country));
+      const base64Logo = await Promise.all(teamLogos.map((teamLogo) => teamLogo));
+      console.debug("base64: ", base64Logo);
+      setTeamData([numbers, names, city, country, base64Logo]);
+      setIsLoading(false);
+    }; 
+    fetchTeamData();
   }, []); // Run effect only once on component mount
 
-  // console.debug("teamNames: ", teamNames);
+  const teamNumbers = teamData[0];
+  const teamNames = teamData[1];
+  const teamCity = teamData[2];
+  const teamCountry = teamData[3];
+  const teamLogos = teamData[4];
+  // Function to parse base64 to Image.ImageLike
+  
+  console.debug("base64: ", teamLogos);
   return (
-    <List>
-      <List.Item
+    <List isLoading={isLoading} searchBarPlaceholder="Serch FRC Teams">
+      {/* <List.Item
         icon="list-icon.png"
         title="All Teams"
         subtitle={teamNumbers.length + " teams"}
         actions={<ActionPanel>
           <Action.OpenInBrowser title="See in The Blue Alliance" url="https://www.thebluealliance.com" />
-        </ActionPanel>} />
+        </ActionPanel>} /> */}
       {(teamNumbers).map((teamNumber, index) => {
         return (
-          console.debug("teamNumber: ", teamNumber, index),
           <List.Item
             key={teamNumber}
-            icon="list-icon.png"
             title={teamNumber}
             subtitle={teamNames[index]} // Use the team name from state
+            keywords={[teamNumber, teamNames[index]]}
+            accessories={[
+              { text: teamCity[index] + ", " + teamCountry[index] },
+            ]}
+            // icon={{ value: teamLogos[index], tintColor: "#000000", tooltip: "" }}
             actions={<ActionPanel>
               <Action.Push title="See team info" target={<TeamInfo teamNumber={teamNumber} />} />
               <Action.OpenInBrowser title="See in The Blue Alliance" url={`https://www.thebluealliance.com/team/${teamNumber}`} />
