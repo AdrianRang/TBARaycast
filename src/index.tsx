@@ -4,7 +4,7 @@ import axios from "axios";
 
 
 const API_KEY = "4FmWpc7JdnQpxdAmng6DVVQ8MMuD9qtIzU6T7auUQViDt6ZJK3v28SIbwurR2J7n";
-const TEAM_LIMIT = 250;
+const TEAM_LIMIT = 500;
 
 
 async function getAllTeamData() {
@@ -26,23 +26,28 @@ async function getAllTeamData() {
 }
 
 async function getTeamLogo(teamNumber: string) {
-  const response = await axios.get(`https://www.thebluealliance.com/api/v3/team/frc254/media/2024`, {
+  const response = await axios.get(`https://www.thebluealliance.com/api/v3/team/frc${teamNumber}/media/2024`, {
     headers: {
       'X-TBA-Auth-Key': API_KEY
     }
   });
-  console.debug("response: ", response.data[0].base64Image);
-  return response.data[0].base64Image;
-  // return "https://www.thebluealliance.com/images/team_logos/2024.png";
+  if (await response.data.length === 0) {
+    return "FIRST_Vertical_RGB.png";
+  }
+  let img = "data:image/png;base64,"
+  img += await response.data[0].details.base64Image;
+  return img;
 }
 
 async function getAllTeamLogos(teamNumbers: string[]) {
   let teamLogos: string[] = [];
-  teamLogos.forEach(async (teamNumber) => {
-    teamLogos.push(await getTeamLogo(teamNumber))
-  });
-  return teamLogos;
+  teamLogos = await Promise.all(teamNumbers.map(async (teamNumber) => await getTeamLogo(teamNumber)))
 
+  // teamLogos.forEach((teamLogo, i) => {
+  //   console.debug(i, teamLogo.charAt(0));
+  // });
+
+  return teamLogos;
 }
 
 export default function Command() {
@@ -53,14 +58,18 @@ export default function Command() {
     // Fetch team numbers and update state
     const fetchTeamData = async () => {
       const teamData = await getAllTeamData();
-      const teamLogos = await getAllTeamLogos((teamData ?? []).map((teamData) => teamData.key.substring(3)));
-
+      
       const numbers = await Promise.all((teamData ?? []).map((teamData) => teamData.key.substring(3)));
       const names = await Promise.all((teamData ?? []).map((teamData) => teamData.nickname));
       const city = await Promise.all((teamData ?? []).map((teamData) => teamData.city));
       const country = await Promise.all((teamData ?? []).map((teamData) => teamData.country));
-      const base64Logo = await Promise.all(teamLogos.map((teamLogo) => teamLogo));
-      console.debug("base64: ", base64Logo);
+
+      const teamLogos = await Promise.all(((await getAllTeamLogos((numbers ?? []))).map((numbers) => numbers)));
+
+      const base64Logo = await Promise.all((teamLogos ?? []).map((teamLogo) => teamLogo));
+
+      // console.debug("base64: ", base64Logo);
+
       setTeamData([numbers, names, city, country, base64Logo]);
       setIsLoading(false);
     }; 
@@ -74,7 +83,7 @@ export default function Command() {
   const teamLogos = teamData[4];
   // Function to parse base64 to Image.ImageLike
   
-  console.debug("base64: ", teamLogos);
+  // console.debug("base64: ", teamLogos);
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Serch FRC Teams">
       {/* <List.Item
@@ -94,7 +103,7 @@ export default function Command() {
             accessories={[
               { text: teamCity[index] + ", " + teamCountry[index] },
             ]}
-            // icon={{ value: teamLogos[index], tintColor: "#000000", tooltip: "" }}
+            icon={{ source: teamLogos[index] }}
             actions={<ActionPanel>
               <Action.Push title="See team info" target={<TeamInfo teamNumber={teamNumber} />} />
               <Action.OpenInBrowser title="See in The Blue Alliance" url={`https://www.thebluealliance.com/team/${teamNumber}`} />

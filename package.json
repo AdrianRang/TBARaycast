@@ -3,13 +3,13 @@
   "name": "thebluealliance",
   "title": "The Blue Alliance",
   "description": "A raycast extension for The Blue Alliance",
-  "icon": "command-icon.png",
+  "icon": "./TBA-icon.png",
   "author": "adrianrang",
   "license": "MIT",
   "commands": [
     {
       "name": "index",
-      "title": "Browse Teams",
+      "title": "Browse FRC Teams",
       "description": "Browse teams from The Blue Alliance",
       "mode": "view"
     }
