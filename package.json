@@ -12,10 +12,17 @@
       "title": "Browse FRC Teams",
       "description": "Browse teams from The Blue Alliance",
       "mode": "view"
+    },
+    {
+      "name": "team",
+      "title": "Search for an FRC Team",
+      "description": "Get information about an FRC team",
+      "mode": "view"
     }
   ],
   "dependencies": {
     "@raycast/api": "^1.78.1",
+    "@raycast/utils": "^1.16.3",
     "axios": "^1.7.2"
   },
   "devDependencies": {

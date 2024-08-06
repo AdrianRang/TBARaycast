@@ -59,6 +59,15 @@ async function getAllTeamLogos(teamNumbers: string[]) {
   return teamLogos;
 }
 
+async function getFullTeamData(teamNumber: string) {
+  const response = await axios.get(`https://www.thebluealliance.com/api/v3/team/frc${teamNumber}`, {
+    headers: {
+      'X-TBA-Auth-Key': API_KEY
+    }
+  });
+  return response.data;
+}
+
 let currPage = 0;
 
 function setPage(page: number) {
@@ -69,7 +78,7 @@ function setPage(page: number) {
 export default function Command() {
   const [teamData, setTeamData] = useState<string[][]>([[]]);
   const [isLoading, setIsLoading] = useState(true);
-  const [items, setItems] = useState<JSX.Element[]>([]);
+  // const [items, setItems] = useState<JSX.Element[]>([]);
 
   useEffect(() => {
     // Fetch team numbers and update state
@@ -106,13 +115,13 @@ export default function Command() {
             ]}
             icon={{ source: teamData[4][index] }}
             actions={<ActionPanel>
-              <Action.Push title="See team info" target={<TeamInfo teamNumber={teamNumber} />} />
+              {/* <Action.Push title="See team info" target={<TeamInfo data={async () => await getFullTeamData(teamNumber)} />} /> */}
               <Action.OpenInBrowser title="See in The Blue Alliance" url={`https://www.thebluealliance.com/team/${teamNumber}`} />
               <Action.CopyToClipboard title="Copy Team Number" content={teamNumber} />
             </ActionPanel>} />
         );
       }));
-      setItems(items);
+      // setItems(items);
     }
     fetchItems();
   }, []); // Run effect only once on component mount
@@ -142,34 +151,141 @@ export default function Command() {
             subtitle={teamNames[index]} // Use the team name from state
             keywords={[teamNumber, teamNames[index], ...teamNames[index].split(" "), teamCity[index] !== null ? teamCity[index] : "N/A", teamCountry[index] !== null ? teamCountry[index] : "N/A"]}
             accessories={[
-              { text: (teamCity[index] !== null ? teamCity[index] : "N/A") + ", " + (teamCountry[index] !== null ? teamCountry[index] : "N/A") },
+              { text: (teamCity[index] !== null ? teamCity[index] : "N/A") + ", " + (teamCountry[index] !== null ? teamCountry[index] : "N/A") }
             ]}
             icon={{ source: teamLogos[index] }}
-            actions={<ActionPanel>
-              <Action.Push title="See team info" target={<TeamInfo teamNumber={teamNumber} />} />
-              <Action.OpenInBrowser title="See in The Blue Alliance" url={`https://www.thebluealliance.com/team/${teamNumber}`} />
-              <Action.CopyToClipboard title="Copy Team Number" content={teamNumber} />
-            </ActionPanel>} />
+            actions={
+              <ActionPanel>
+                <Action.Push title="See team info" target={<TeamInfo teamNumber={teamNumber}/>} />
+                <Action.OpenInBrowser title="See in The Blue Alliance" url={`https://www.thebluealliance.com/team/${teamNumber}`} />
+                <Action.CopyToClipboard title="Copy Team Number" content={teamNumber} />
+              </ActionPanel>
+            }
+          />
         );
-      })}
-
+      }
+      )}
       <List.Item
         title={"Go to next page"}
         icon={Icon.ArrowRight}
         actions={<ActionPanel>
           {/* <Action title="Go to next page" onAction={setPage(currPage + 1)} /> */}
-        </ActionPanel>} 
+        </ActionPanel>
+        }
       />
-
     </List>
   );
 }
 
 function TeamInfo(props: { teamNumber: string }) {
-  const markdown = `
-  # Team Info ${props.teamNumber}
+  const [teamData, setTeamData] = useState<any>();
+  const [teamLogo, setTeamLogo] = useState<string>();
+  const [detailmetadata, setMetadata] = useState<any>();
+  const [championships, setChamp] = useState<string[][]>([])
+
+  useEffect(() => {
+    const fetchTeamData = async () => {
+      const teamData = (await getFullTeamData(props.teamNumber));
+      setTeamData(teamData);
+    }
+    fetchTeamData();
+
+    const fetchTeamLogo = async () => {
+      let teamLogo = (await getTeamLogo(props.teamNumber))
+      teamLogo = teamLogo === "FIRST_Vertical_RGB_DarkMode.png" ? "" : teamLogo
+      setTeamLogo(teamLogo)
+    }
+    fetchTeamLogo()
+
+    const fetchChamps = async () => {
+      const response = await axios.get(`https://www.thebluealliance.com/api/v3/team/frc${props.teamNumber}/events/simple`, {
+        headers:{
+          'X-TBA-Auth-Key': API_KEY
+        }
+      })
+
+      let champs: string[] = [];
+      let final: string[] = [];
+      response.data.forEach((eventDat: any) => {
+        if(eventDat.event_type === 4) {
+          champs.push(eventDat.key.substring(0, 4));
+          final.push("true");
+        }else if(eventDat.event_type === 3){
+          champs.push(eventDat.key.substring(0, 4))
+          final.push("false")
+        }
+      })
+
+      // Remove duplicates from champs
+      const uniqueChamps:string[] = [];
+      for (let champ of champs) {
+        if (!uniqueChamps.includes(champ)) {
+          uniqueChamps.push(champ);
+        }
+      }
+      champs = uniqueChamps;
+
+      setChamp([champs, final])
+      return [champs, final]
+    }
+    fetchChamps()
+
+    const fetchMetadata = async () => {
+      const teamData = (await getFullTeamData(props.teamNumber));
+      const championships = await fetchChamps();
+
+      console.debug("Generating Metadata...")
+
+      const meta = () => {
+        return(
+          <Detail.Metadata>
+            <Detail.Metadata.Label title="Rookie Year" text={"" + teamData.rookie_year} />
+            <Detail.Metadata.TagList title="Championships">
+              {(championships[0] ?? []).map((championship: string, i) =>{
+                console.debug("adding:" + championship)
+                return(
+                  <Detail.Metadata.TagList.Item text={(championship).substring(0, 4)} color={championships[1][i] == "true" ? "#22c55e": "#eab308"}/>
+                )
+              })
+              }
+            </Detail.Metadata.TagList>
+            <Detail.Metadata.Separator />
+            <Detail.Metadata.Link title="website" target={teamData.website} text={teamData.website}/>
+            <Detail.Metadata.Separator/>
+            <Detail.Metadata.Label title="Location" text={teamData.city + ", " + teamData.state_prov + ", " + teamData.country}/>
+            <Detail.Metadata.Label title="School" text={teamData.school_name}/>
+            {
+              <Detail.Metadata.Label title="Address" text={teamData.address !== null ? teamData.address : "N/A"}/>
+            }
+            <Detail.Metadata.Label title="Postal Code" text={teamData.postal_code  !== null ? teamData.postal_code : "N/A"} />
+          </Detail.Metadata>
+        )
+      }
+      setMetadata(meta())
+    }
+    fetchMetadata()
+  }, [])
+  
+  let markdown = "";
+  try {
+  markdown = `
+  # ${teamLogo !== "" ? `![Team Logo](${teamLogo})  `: ""}Team #${props.teamNumber}, ${teamData.nickname}
+  ###### *${teamData.name}*
+  ${teamData.moto !== undefined ? "\"" + teamData.moto + "\"" : ""}
   `;
+  }
+  catch(error) {console.log("Loading..."); markdown = "# Loading..."}
+ 
   return (
-    <Detail markdown={markdown} />
-  );
+    <Detail markdown={markdown} metadata={detailmetadata} />
+    // <ActionPanel>
+    //   <Action.Push title="Events participated" target={<Events />} />
+    // </ActionPanel>
+  )
+}
+
+function Events(){
+  return(
+    <Detail markdown={"Events"}/>
+  )
 }
