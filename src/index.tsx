@@ -68,11 +68,13 @@ async function getFullTeamData(teamNumber: string) {
   return response.data;
 }
 
-let currPage = 0;
-
-function setPage(page: number) {
-  currPage = page;
-  return page;
+let page = 0;
+function nextPage() {
+  page++;
+  console.debug("Next Page", page);
+  return (
+    <Command />
+  );
 }
 
 export default function Command() {
@@ -99,7 +101,7 @@ export default function Command() {
       setTeamData([numbers, names, city, country, base64Logo]);
       setIsLoading(false);
     };
-    fetchTeamData(currPage);
+    fetchTeamData(page);
 
     const fetchItems = async () => {
       // console.debug("teamData: ", teamData.length);
@@ -169,7 +171,8 @@ export default function Command() {
         title={"Go to next page"}
         icon={Icon.ArrowRight}
         actions={<ActionPanel>
-          {/* <Action title="Go to next page" onAction={setPage(currPage + 1)} /> */}
+          {/* //TODO: Runs like 5 times */}
+          <Action.Push title="Next Page" target={nextPage()} />
         </ActionPanel>
         }
       />
