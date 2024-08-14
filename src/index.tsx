@@ -1,4 +1,4 @@
-import { ActionPanel, Action, List, Detail, Image, Icon, useNavigation } from "@raycast/api";
+import { ActionPanel, Action, List, Detail, Image, Icon, useNavigation, showToast, Toast } from "@raycast/api";
 import { useEffect, useState } from "react";
 import type { JSX } from "react";
 import axios from "axios";
@@ -73,13 +73,28 @@ let page = 0;
 export default function Command() {
   const [teamData, setTeamData] = useState<string[][]>([[]]);
   const [isLoading, setIsLoading] = useState(true);
-  const { push } = useNavigation();
+  const { pop, push } = useNavigation();
 
   const nextPage = async () => {
-    page++;
+    if (page === 19) {
+      showToast({ title: "You are already on the last page", style: Toast.Style.Failure });
+      return;
+    }
+    showToast({ title: `You are now on page ${++page}`, style: Toast.Style.Success });
+    pop();
     push(<Command />);
   }
-  
+
+  const lastPage = async () => {
+    if (page === 0) {
+      showToast({ title: "You are already on the first page", style: Toast.Style.Failure });
+      return;
+    };
+    showToast({ title: `You are now on page ${--page}`, style: Toast.Style.Success });
+    pop();
+    push(<Command />);
+  }
+
   useEffect(() => {
     // Fetch team numbers and update state
     const fetchTeamData = async (page: number) => {
@@ -136,13 +151,14 @@ export default function Command() {
   // console.debug("base64: ", teamLogos);
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Serch FRC Teams">
-      {/* <List.Item
-        icon="list-icon.png"
-        title="All Teams"
-        subtitle={teamNumbers.length + " teams"}
+      <List.Item
+        title={"Go to last page"}
+        icon={Icon.ArrowLeft}
         actions={<ActionPanel>
-          <Action.OpenInBrowser title="See in The Blue Alliance" url="https://www.thebluealliance.com" />
-        </ActionPanel>} /> */}
+          <Action icon={Icon.ArrowRight} title="Last Page" onAction={lastPage} />
+        </ActionPanel>
+        }
+      />
       {(teamNumbers).map((teamNumber, index) => {
         return (
           <List.Item
@@ -169,8 +185,6 @@ export default function Command() {
         title={"Go to next page"}
         icon={Icon.ArrowRight}
         actions={<ActionPanel>
-          {/* //TODO: Runs like 5 times */}
-          {/* <Action.Push title="Next Page" target={nextPage()} /> */}
           <Action icon={Icon.ArrowRight} title="Next Page" onAction={nextPage} />
         </ActionPanel>
         }
