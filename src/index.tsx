@@ -1,4 +1,4 @@
-import { ActionPanel, Action, List, Detail, Image, Icon } from "@raycast/api";
+import { ActionPanel, Action, List, Detail, Image, Icon, useNavigation } from "@raycast/api";
 import { useEffect, useState } from "react";
 import type { JSX } from "react";
 import axios from "axios";
@@ -69,19 +69,17 @@ async function getFullTeamData(teamNumber: string) {
 }
 
 let page = 0;
-function nextPage() {
-  page++;
-  console.debug("Next Page", page);
-  return (
-    <Command />
-  );
-}
 
 export default function Command() {
   const [teamData, setTeamData] = useState<string[][]>([[]]);
   const [isLoading, setIsLoading] = useState(true);
-  // const [items, setItems] = useState<JSX.Element[]>([]);
+  const { push } = useNavigation();
 
+  const nextPage = async () => {
+    page++;
+    push(<Command />);
+  }
+  
   useEffect(() => {
     // Fetch team numbers and update state
     const fetchTeamData = async (page: number) => {
@@ -172,7 +170,8 @@ export default function Command() {
         icon={Icon.ArrowRight}
         actions={<ActionPanel>
           {/* //TODO: Runs like 5 times */}
-          <Action.Push title="Next Page" target={nextPage()} />
+          {/* <Action.Push title="Next Page" target={nextPage()} /> */}
+          <Action icon={Icon.ArrowRight} title="Next Page" onAction={nextPage} />
         </ActionPanel>
         }
       />
